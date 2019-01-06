@@ -18,6 +18,7 @@ class DirectoryTreePrinter(
 ): SimpleFileVisitor<Path>() {
     private val rootPathNameCount = rootPath.nameCount
     private val treeBuilder = StringBuilder()
+    private var counter = 0
 
     init {
         if (!Files.isDirectory(rootPath)) {
@@ -54,6 +55,8 @@ class DirectoryTreePrinter(
         val nameCount = path.nameCount
         val interval = nameCount - rootPathNameCount
 
+        treeBuilder.append(counter++).append("| ")
+
         if (interval == 0) {
             treeBuilder.append("Tree excluding: $excludedDirNames, root directory: ").append(path.parent).append("\\")
         }
@@ -70,12 +73,11 @@ class DirectoryTreePrinter(
 
         treeBuilder
                 .append(path.fileName)
-                .append(" |")
-                .append(" T@${attrs.printFileType()}")
-                .append(" S@${if (isFile) attrs.size() else 0 }")
-                .append(" C@${attrs.creationTime().format(timezoneId)}")
-                .append(" M@${attrs.lastModifiedTime().format(timezoneId)}")
-                .append(" A@${attrs.lastAccessTime().format(timezoneId)}")
+                .append("| /T@${attrs.printFileType()}")
+                .append("/S@${if (isFile) attrs.size() else 0 }")
+                .append("/C@${attrs.creationTime().format(timezoneId)}")
+                .append("/M@${attrs.lastModifiedTime().format(timezoneId)}")
+                .append("/A@${attrs.lastAccessTime().format(timezoneId)}")
                 .appendln()
     }
 
