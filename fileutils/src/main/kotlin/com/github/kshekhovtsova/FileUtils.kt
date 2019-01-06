@@ -36,83 +36,28 @@ private fun main0(args: Array<String>) {
             val rootPath = cliArgs.rootPath
             val zoneId = cliArgs.zoneId
 
-            val treePrinter = DirectoryTreePrinter(rootPath, zoneId, cliArgs.excludeDirNames)
+            val treeBuilder = DirectoryTreeBuilder(rootPath, zoneId, cliArgs.excludeDirNames)
 
-            Files.walkFileTree(rootPath, treePrinter)
+            Files.walkFileTree(rootPath, treeBuilder)
 
-            println(treePrinter.print())
-        }
-        CliOperation.parsetree -> {
-            val treePath = when (args.size) {
-                1 -> throw IllegalArgumentException("Not enough args: $args")
-                2 -> Paths.get(args[1])
-                else -> throw IllegalArgumentException("Too many args: $args")
-            }
-
-            print(getDuplicates(treePath))
-
+            println(treeBuilder.tree())
+            println("Duplicates:")
+            println(treeBuilder.duplicates())
         }
         else -> UnsupportedOperationException(cliOp.toString())
     }
 }
 
-private fun getDuplicates(path: Path): String {
-    val allEntries = Files
-            .lines(path)
-            .map { TreeEntry.parse(it, "_", 2) }
-            .collect(Collectors.toList())
-
-    val duplicates = allEntries
-            .groupBy { DistinctBy(it.fileName, it.type, it.size) }
-            .filter { (_, v) -> v.size > 1 }
-
-    val sb = StringBuilder()
-
-    duplicates.forEach { (k, v) ->
-        sb.appendln(k)
-        v.forEach { entry -> sb.appendln("Num in tree: " + entry.num) }
-    }
-
-    return sb.toString()
-}
-
 data class DistinctBy(
         val fileName: String,
-        val type: String,
-        val size: String
+        val size: Long
 )
 
 data class TreeEntry(
-        val num: Int,
         val fileName: String,
-        val type: String,
-        val size: String,
-        val created: String,
-        val modified: String
-) {
-    companion object {
-        //    |__dir1-1| /T@D+F-S-O-/S@0/C@2019-01-06T15:54:26.875404+03:00/M@2019-01-06T15:54:41.221862+03:00/A@2019-01-06T15:54:41.221862+03:00
-        fun parse(text: String, indentSymbol: String, indentSize: Int): TreeEntry {
-            val num = text.substringBefore("| ").toInt()
-            val indentPathChars = "|" + indentSymbol.repeat(indentSize)
-            var line = text.substringAfter("| ")
-            if (line.contains(indentPathChars)) {
-                line = text.substringAfter(indentPathChars)
-            }
-            val fileName = line.substringBefore("|")
-            val parsed = line.substringAfter("/").split("/")
-            if (parsed.size != 5) throw IllegalArgumentException(text)
-            return TreeEntry(
-                    num,
-                    fileName,
-                    parsed[0].substringAfter("T@"),
-                    parsed[1].substringAfter("S@"),
-                    parsed[2].substringAfter("C@"),
-                    parsed[3].substringAfter("M@")
-            )
-        }
-    }
-}
+        val size: Long,
+        val path: Path
+)
 
 enum class CliOperation {
     maketree,
