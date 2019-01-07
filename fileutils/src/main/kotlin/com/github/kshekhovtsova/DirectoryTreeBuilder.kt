@@ -16,6 +16,7 @@ class DirectoryTreeBuilder(
         rootPath: Path,
         val timezoneId: ZoneId,
         val excludedDirNames: Set<String>,
+        val printFullPath: Boolean = false,
         val indentSymbol: String = "_",
         val indentSize: Int = 2
 ) : SimpleFileVisitor<Path>() {
@@ -23,7 +24,7 @@ class DirectoryTreeBuilder(
     private val treeBuilder = StringBuilder()
     private var counter = 0L
     private val forbiddenPaths = mutableMapOf<String, String>()
-    private val allFiles = mutableListOf<TreeEntry>()
+    private val systemLineSeparator = System.getProperty("line.separator")!!
 
     init {
         if (!Files.isDirectory(rootPath)) {
@@ -48,11 +49,12 @@ class DirectoryTreeBuilder(
     override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
         val dirName = dir.fileName?.toString()
 
+        appendToTree(dir, attrs, false)
+
         if (excludedDirNames.any { excludedDir -> dirName == excludedDir }) {
             return FileVisitResult.SKIP_SUBTREE
         }
 
-        appendToTree(dir, attrs, false)
         return FileVisitResult.CONTINUE
     }
 
@@ -77,7 +79,8 @@ class DirectoryTreeBuilder(
         treeBuilder.append(String.format("% 9d", counter++)).append("| ")
 
         if (interval == 0) {
-            treeBuilder.append("Tree excluding: $excludedDirNames, root directory: ").append(path.parent ?: path).append("\\")
+            treeBuilder.appendln("Tree excluding: $excludedDirNames, root directory: $path")
+            return
         }
 
         if (interval > 1) {
@@ -90,10 +93,11 @@ class DirectoryTreeBuilder(
                     .append(indentSymbol.repeat(indentSize))
         }
 
-        val fileName: String = path.fileName?.toString() ?: ""
-
-        if (isFile) {
-            allFiles.add(TreeEntry(fileName, attrs.size(), path))
+        val fileName: String = if (printFullPath) {
+            path.toString()
+        }
+        else {
+            path.fileName.toString()
         }
 
         treeBuilder
@@ -106,38 +110,9 @@ class DirectoryTreeBuilder(
                 .appendln()
     }
 
-    fun tree() = treeBuilder.toString()
-
-    fun duplicates() = getDuplicates(allFiles)
+    fun tree() = treeBuilder.deleteCharAt(treeBuilder.lastIndexOf(systemLineSeparator)).toString()
 
     fun errors() = forbiddenPaths.toString()
-}
-
-private fun getDuplicates(files: List<TreeEntry>): String {
-    val duplicates = files
-            .groupBy { DistinctBy(it.fileName, it.size) }
-            .filter { (_, v) -> v.isNotEmpty() }
-
-    val parents = HashMap<String, Long>()
-
-    duplicates.forEach { (_, v) ->
-        if (v.size > 1) {
-            v.forEach { entry ->
-                entry.path.parent?.let {
-                    val parentDir = entry.path.parent.toString()
-                    parents.compute(parentDir, { _, v -> if (v == null) 1L else v + 1 })
-                }
-            }
-        }
-    }
-
-    val sb = StringBuilder()
-
-    parents.entries
-            .sortedByDescending { e -> e.value }
-            .forEach { e -> sb.appendln(e) }
-
-    return sb.toString()
 }
 
 private fun FileTime.format(timezoneId: ZoneId) =
